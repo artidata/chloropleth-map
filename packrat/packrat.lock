@@ -19,6 +19,17 @@ Version: 0.4
 Hash: a6e844446350a7128c734516fa8215e3
 Requires: crosstalk, htmltools, htmlwidgets, magrittr
 
+Package: MASS
+Source: CRAN
+Version: 7.3-50
+Hash: e8001243da35880bd81391d80eb4eeae
+
+Package: Matrix
+Source: CRAN
+Version: 1.2-14
+Hash: 521aa8772a1941dfdb007bf532d19dde
+Requires: lattice
+
 Package: R6
 Source: CRAN
 Version: 2.2.2
@@ -43,6 +54,7 @@ Package: class
 Source: CRAN
 Version: 7.3-14
 Hash: 98330808284e70f0bce1f8ff419d4032
+Requires: MASS
 
 Package: classInt
 Source: CRAN
@@ -92,8 +104,8 @@ Package: ggplot2
 Source: CRAN
 Version: 3.0.0
 Hash: 8332448b76ff31472a1bf6dd31fcddb1
-Requires: digest, gtable, lazyeval, plyr, reshape2, rlang, scales,
-    tibble, viridisLite, withr
+Requires: MASS, digest, gtable, lazyeval, mgcv, plyr, reshape2, rlang,
+    scales, tibble, viridisLite, withr
 
 Package: glue
 Source: CRAN
@@ -139,6 +151,11 @@ Version: 0.7.5
 Hash: c24487d2467d8f78dfa8fa8282211a51
 Requires: BH, Rcpp, rlang
 
+Package: lattice
+Source: CRAN
+Version: 0.20-35
+Hash: 26b9d7f0d0cb4e1d1bbb97f867c82d89
+
 Package: lazyeval
 Source: CRAN
 Version: 0.2.1
@@ -148,6 +165,12 @@ Package: magrittr
 Source: CRAN
 Version: 1.5
 Hash: bdc4d48c3135e8f3b399536ddf160df4
+
+Package: mgcv
+Source: CRAN
+Version: 1.8-24
+Hash: a56dfc15ea064de70627f483af3bfa6f
+Requires: Matrix, nlme
 
 Package: mime
 Source: CRAN
@@ -159,6 +182,12 @@ Source: CRAN
 Version: 0.5.0
 Hash: 247d1c1d72f3072563912ef860758624
 Requires: colorspace
+
+Package: nlme
+Source: CRAN
+Version: 3.1-137
+Hash: 6166071071587a867cbe534e84fc5c0c
+Requires: lattice
 
 Package: packrat
 Source: github
