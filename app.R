@@ -155,7 +155,7 @@ server <- function(input, output, session) {
                          by.y=colnames(datasetSampleCurrent())[1]),
              sf <- merge(sf,datasetUploadCurrent(),
                          by.x=colnames(sf)[1],
-                         by.y=colnames(datasetOutputCurrent())[1]))
+                         by.y=colnames(datasetUploadCurrent())[1]))
       
       replot <- ggplot(data = sf)
       
@@ -222,7 +222,7 @@ server <- function(input, output, session) {
   output$downloadDatasetSample <- downloadHandler(
     
     filename = function() {
-      paste0(typePlotCurrent(), ".csv")},
+      paste0(input$region,".csv")},
     
     content = function(file) {
       write.csv(datasetSampleCurrent(), file,row.names = F)}) #annoying write.csv
