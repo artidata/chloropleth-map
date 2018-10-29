@@ -22,26 +22,32 @@ ui <- dashboardPage(
     selectInput(
       inputId = "division",
       label = "Division:",
-      choices = list.files(paste0("raw_data/world"))), #hard coding
+      choices = list.files("raw_data/world")), #hard coding
 
     selectInput(
       inputId = "themePlot",
       label = "Theme:",
-      choices = list("Grid", "Minimal"),
-      selected = "Grid"),
+      choices = list(#"Grid",
+                     #"Floral",
+                     #"Night",
+                     "Minimal"),
+      selected = "Minimal"),
     
     selectInput(
       inputId = "methodPlot",
       label = "Method:",
-      choices = list("Standard", "Facet", "Interactive", "Animation"),
+      choices = list("Standard", 
+                     #"Interactive", 
+                     #"Animation",
+                     "Facet"),
       selected = "Standard"),
     
-    conditionalPanel(
-      condition = "input.methodPlot == 'Standard'",
-      
-      checkboxInput(
-        inputId = "islabeled",
-        label = "Label")),
+    # conditionalPanel(
+    #   condition = "input.methodPlot == 'Standard'",
+    #   
+    #   checkboxInput(
+    #     inputId = "islabeled",
+    #     label = "Label")),
     
     conditionalPanel(
       condition = "input.methodPlot == 'Facet'",
@@ -166,46 +172,69 @@ server <- function(input, output, session) {
       replot <- replot + geom_sf(aes_string(fill = nameCol))
       
       if(is.numeric(valueCol)){
-        if(max(valueCol) > 0 & min(valueCol) < 0) {
-          replot <- replot +
-            scale_fill_gradientn(
-              colors = c(rev(brewer.pal(4, "Reds")),
-                         brewer.pal(4, "Greens")),
-              limits = c(-extremeValue, extremeValue))} 
         
-        else if(min(valueCol) >= 0){
+        if(input$themePlot == "Minimal"){
+          
+          if(max(valueCol) > 0 & min(valueCol) < 0){
+            replot <- replot +
+              scale_fill_gradientn(
+                colors = c(rev(brewer.pal(4, "Reds")),
+                           brewer.pal(4, "Greens")),
+                limits = c(-extremeValue, extremeValue))}
+          
+          else if(min(valueCol) >= 0){ #all values positive
+            replot <- replot +
+              scale_fill_gradientn(colors = c(brewer.pal(9, "Greens")),
+                                   limits = c(0, extremeValue))}
+                
+          else if(max(valueCol) <= 0){ #all values negative
+                replot <- replot +
+                  scale_fill_gradientn(colors = rev(c(brewer.pal(9, "Reds"))),
+                                       limits = c(-extremeValue, 0))}
+          
           replot <- replot +
-            scale_fill_gradientn(colors = c(brewer.pal(9, "Greens")),
-                                 limits = c(0, extremeValue))} 
-        else if (max(valueCol) <= 0){
-          replot <- replot +
-            scale_fill_gradientn(colors = rev(c(brewer.pal(9, "Reds"))),
-                                 limits = c(-extremeValue, 0))}
-          replot <- replot+guides(fill = guide_colorbar(barheight = input$heightPlot/50,
-                                                        ticks.colour = "black",
-                                                        frame.colour= "black"))}
+            coord_sf(datum=NA)+ #bug
+            theme_minimal()}
+                  
+        # else if(input$themePlot == "Floral"){
+        #   
+        #   if(max(valueCol) > 0 & min(valueCol) < 0){
+        #     replot <- replot +
+        #       scale_fill_gradientn(
+        #         colors = c(rev(brewer.pal(4, "RdPu")),
+        #                    brewer.pal(4, "PuBuGn")),
+        #         limits = c(-extremeValue, extremeValue))}
+        #   
+        #   replot <- replot +
+        #     coord_sf(datum=NA)+ #bug
+        #     theme_minimal()+
+        #     theme(plot.background = element_rect(fill=hcl(90,50,100)))}
+        # 
+        # else if(input$themePlot == "Night"){
+        #   
+        #   if(max(valueCol) > 0 & min(valueCol) < 0){
+        #     replot <- replot +
+        #       scale_fill_gradientn(
+        #         colors = c(rev(brewer.pal(4, "RdPu")),
+        #                    brewer.pal(4, "PuBuGn")),
+        #         limits = c(-extremeValue, extremeValue))}
+        #   
+        #   replot <- replot +
+        #     coord_sf(datum=NA)+ #bug
+        #     theme_minimal()+
+        #     theme(plot.background = element_rect(fill=hcl(90,50,100)))}
+        }
       
+        
+        replot <- replot+guides(fill = guide_colorbar(barheight = input$heightPlot/50,
+                                                      ticks.colour = "black",
+                                                      frame.colour= "black"))
+      
+
       if(input$methodPlot=="Facet"){
         ifelse(input$numCategory == 1,
                replot <- replot + facet_wrap(as.formula(paste0("~",colnames(sf)[2]))),
                replot <- replot + facet_grid(as.formula(paste0(colnames(sf)[2],"~",colnames(sf)[3]))))}
-      
-      if(input$themePlot=="Grid"){
-        replot <- replot + theme_light()+theme(
-          panel.border = element_rect(colour = "black"),
-          legend.position = "right",
-          strip.background = element_rect(fill = "white",color = "black"),
-          strip.text = element_text(color = "black"),
-          axis.title.x = element_blank(),
-          axis.title.y = element_blank())}
-      
-      else if(input$themePlot=="Minimal"){
-        replot <- replot +
-          coord_sf(datum=NA)+ #bug
-          theme_minimal()+
-          theme(plot.background = element_rect(fill="#deebf7",
-                                               color = "#deebf7"))}
-      
       replot <- replot+theme(
         text = element_text(size = input$sizeFontPlot))
       
