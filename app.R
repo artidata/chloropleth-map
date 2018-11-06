@@ -175,7 +175,7 @@ server <- function(input, output, session) {
   
   dirCurrent <- reactive({
     paste0("raw_data/",input$region,"/",input$division)
-  }) %>% debounce(200)
+  }) %>% debounce(200) #debouce
   
   ratioCurrent <- reactive({
     input$execute
