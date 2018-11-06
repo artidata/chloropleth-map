@@ -4,97 +4,141 @@ library(DT)
 library(ggplot2)
 library(sf)
 library(RColorBrewer)
+library(shinycssloaders)
 
 ui <- dashboardPage(
   dashboardHeader(
     title = "Choropleth Map",
-    titleWidth = 240),
+    titleWidth = 240,
+    dropdownMenu(type = "messages",
+                 messageItem(
+                   from = "artidata",
+                   message = "Click here to learn more about the app!",
+                   href = "http://artidata.io/blog/posts/2018-10-29-choropleth-map-app/"))),
   
   dashboardSidebar(
     width = 240,
     
     selectInput(
       inputId = "region",
-      label = "Region:",
+      label = "Region",
       choices = list.files("raw_data/"),
       selected = "world"),
     
     selectInput(
       inputId = "division",
-      label = "Division:",
+      label = "Division",
       choices = list.files("raw_data/world")), #hard coding
 
     selectInput(
-      inputId = "themePlot",
-      label = "Theme:",
-      choices = list(#"Grid",
-                     #"Floral",
-                     #"Night",
-                     "Minimal"),
+      inputId = "theme",
+      label = "Theme",
+      choices = list("Minimal"),
       selected = "Minimal"),
     
+    
     selectInput(
-      inputId = "methodPlot",
-      label = "Method:",
+      inputId = "colorPositive",
+      label = "( + ) Color",
+      choices = list("Blues","BuGn","BuPu","GnBu",
+                     "Greens","Greys","Oranges","OrRd",
+                     "PuBu","PuBuGn","PuRd","Purples",
+                     "RdPu","Reds","YlGn","YlGnBu","YlOrBr","YlOrRd"),
+      selected = "Greens",
+      width = "50%"),
+    
+    selectInput(
+      inputId = "colorNegative",
+      label = "( - ) Color",
+      choices = list("Blues","BuGn","BuPu","GnBu",
+                     "Greens","Greys","Oranges","OrRd",
+                     "PuBu","PuBuGn","PuRd","Purples",
+                     "RdPu","Reds","YlGn","YlGnBu","YlOrBr","YlOrRd"),
+      selected = "Reds",
+      width = "50%"),
+  
+    selectInput(
+      inputId = "method",
+      label = "Method",
       choices = list("Standard", 
-                     #"Interactive", 
-                     #"Animation",
                      "Facet"),
       selected = "Standard"),
     
-    # conditionalPanel(
-    #   condition = "input.methodPlot == 'Standard'",
-    #   
-    #   checkboxInput(
-    #     inputId = "islabeled",
-    #     label = "Label")),
-    
     conditionalPanel(
-      condition = "input.methodPlot == 'Facet'",
+      condition = "input.method == 'Facet'" ,
       
-      numericInput(
+      radioButtons(
         inputId = "numCategory",
-        label = "Additional Category Level:",
-        value = 1,
-        min = 1,
-        max = 2)),
+        label = "Additional Category Level",
+        choices = list(1,2),
+        selected = 1,
+        inline = T)),
     
     numericInput(
-      inputId = "heightPlot",
-      label = "Height (px):",
-      value = 400,
-      width = "50%"),
-    
-    numericInput(
-      inputId = "widthPlot",
-      label = "Width (px):",
-      value = 800,
-      width = "50%"),
-    
-    numericInput(
-      inputId = "sizeFontPlot",
-      label = "Font Size (px):",
+      inputId = "sizeFont",
+      label = "Font Size (px)",
       value = 12,
       width = "50%"),
     
-    fileInput("csv", "Upload CSV File:"),
+    fileInput("csv", "Upload CSV File"),
     
     radioButtons(
-      inputId = "datasetPlot",
-      label = "Dataset:",
+      inputId = "dataset",
+      label = "Dataset",
       choices = list("Sample", "Upload"),
+      inline = T,
       selected = "Sample"),
     
     actionButton(
-      inputId = "executePlot",
-      label = "RE-PLOT")),
+      inputId = "execute",
+      label = "RE-PLOT",
+      style = "color: #fff; background-color: #3c8dbc; border-color: #3c8dbc;"),
+    
+    tags$head(tags$style(HTML("
+    #execute:hover{background-color:#367fa9 !important;}"))),
+    
+    checkboxInput(
+      inputId = "manualSize",
+      label = "Manual Size",
+      value =  F),
+    
+    conditionalPanel(
+      condition = "input.manualSize == true",
+      
+      numericInput(
+        inputId = "height",
+        label = "Height (px)",
+        value = 400,
+        width = "50%"),
+      
+      numericInput(
+        inputId = "width",
+        label = "Width (px)",
+        value = 800,
+        width = "50%")
+    )),
+
 
   
   dashboardBody(
+    # some javascript
+    tags$head(tags$script('
+                                var sizeBox = [0, 0];
+                                $(document).on("shiny:connected", function(e) {
+                                    sizeBox[0] = document.getElementById("box").offsetWidth-52;
+                                    sizeBox[1] = window.innerHeight;
+                                    Shiny.onInputChange("sizeBox", sizeBox);
+                                });
+                                $(window).resize(function(e) {
+                                    sizeBox[0] = document.getElementById("box").offsetWidth-52;
+                                    sizeBox[1] = window.innerHeight;
+                                    Shiny.onInputChange("sizeBox", sizeBox);
+                                });
+                            ')),
     
     fluidRow(
       
-      uiOutput(outputId  = "boxPlot")),
+      uiOutput(outputId  = "box")),
                 
     fluidRow(
       
@@ -123,23 +167,34 @@ ui <- dashboardPage(
 
 server <- function(input, output, session) {
   
-  #observe
   observeEvent(input$region,{
     updateSelectInput(session,
                       inputId = "division",
                       choices = list.files(paste0(
                         "raw_data/", input$region)))})
-
+  
+  dirCurrent <- reactive({
+    paste0("raw_data/",input$region,"/",input$division)
+  }) %>% debounce(200) #debouce
+  
+  ratioCurrent <- reactive({
+    input$execute
+    isolate({
+      as.numeric(readLines(paste0(dirCurrent(),"/ratio.txt")))
+    })
+  })
+ 
   datasetSampleCurrent <- reactive({
-    df <- read.csv(paste0(
-      "raw_data/",input$region,"/",input$division,"/division.csv"),
-      header = T)
+  
+    df <- read.csv(paste0(dirCurrent(),"/division.csv"),header = T) 
     
-    if(input$methodPlot == "Facet"){
+    if(input$method == "Facet"){
       ifelse(input$numCategory==1,
-             df <- expand.grid(df[,1],category =  LETTERS[1:sample(2:26,1)]),
-             df <- expand.grid(df[,1],category1 = LETTERS[1:sample(2:6,1)],
-                               category2 = letters[1:sample(2:6,1)]))}
+             df <- expand.grid(category =  LETTERS[1:sample(2:26,1)],
+                               division = df[,1]),
+             df <- expand.grid("category_1" = LETTERS[1:sample(2:6,1)],
+                               "category_2" = letters[1:sample(2:6,1)],
+                               division = df[,1]))}
     
     return(cbind(df,value = rnorm(nrow(df))))})
   
@@ -149,19 +204,16 @@ server <- function(input, output, session) {
     else{read.csv(input$csv$datapath,header = T)}})
   
   plotCurrent <- reactive({
-    input$executePlot
+    
+    input$execute
     isolate({
-      sf <- st_read(paste0(
-        "raw_data/",input$region,"/",input$division,
-            "/data.shp"))
+      sf <- st_read(paste0(dirCurrent(),"/data.shp"))
       
-      ifelse(input$datasetPlot=="Sample",
+      ifelse(input$dataset=="Sample",
              sf <- merge(sf,datasetSampleCurrent(),
-                         by.x=colnames(sf)[1],
-                         by.y=colnames(datasetSampleCurrent())[1]),
+                         by = "division"),
              sf <- merge(sf,datasetUploadCurrent(),
-                         by.x=colnames(sf)[1],
-                         by.y=colnames(datasetUploadCurrent())[1]))
+                         by = "division"))
       
       replot <- ggplot(data = sf)
       
@@ -173,109 +225,89 @@ server <- function(input, output, session) {
       
       if(is.numeric(valueCol)){
         
-        if(input$themePlot == "Minimal"){
+        if(input$theme == "Minimal"){
+          
+          pal1 <- c(rev(brewer.pal(4, input$colorNegative)),brewer.pal(4, input$colorPositive)) #pal diverge
+          pal2 <- c(brewer.pal(9, input$colorPositive)) #pal positive 
+          pal3 <- c(brewer.pal(9, input$colorNegative)) #pal negative
+          
+          pal <- NULL 
+          lim <- NULL
           
           if(max(valueCol) > 0 & min(valueCol) < 0){
-            replot <- replot +
-              scale_fill_gradientn(
-                colors = c(rev(brewer.pal(4, "Reds")),
-                           brewer.pal(4, "Greens")),
-                limits = c(-extremeValue, extremeValue))}
+            pal <- pal1
+            lim <- c(-extremeValue, extremeValue)
+          }else if(max(valueCol)<=0){
+            pal <- rev(pal3)
+            lim <- c(-extremeValue, 0)
+          }else if(min(valueCol)>=0){
+            pal <- pal2
+            lim <- c(0,extremeValue)}
           
-          else if(min(valueCol) >= 0){ #all values positive
-            replot <- replot +
-              scale_fill_gradientn(colors = c(brewer.pal(9, "Greens")),
-                                   limits = c(0, extremeValue))}
-                
-          else if(max(valueCol) <= 0){ #all values negative
-                replot <- replot +
-                  scale_fill_gradientn(colors = rev(c(brewer.pal(9, "Reds"))),
-                                       limits = c(-extremeValue, 0))}
+          replot <- replot + 
+            scale_fill_gradientn(colors = pal, 
+                                 limits = lim, 
+                                 na.value = "grey50")
           
           replot <- replot +
             coord_sf(datum=NA)+ #bug
-            theme_minimal()}
-                  
-        # else if(input$themePlot == "Floral"){
-        #   
-        #   if(max(valueCol) > 0 & min(valueCol) < 0){
-        #     replot <- replot +
-        #       scale_fill_gradientn(
-        #         colors = c(rev(brewer.pal(4, "RdPu")),
-        #                    brewer.pal(4, "PuBuGn")),
-        #         limits = c(-extremeValue, extremeValue))}
-        #   
-        #   replot <- replot +
-        #     coord_sf(datum=NA)+ #bug
-        #     theme_minimal()+
-        #     theme(plot.background = element_rect(fill=hcl(90,50,100)))}
-        # 
-        # else if(input$themePlot == "Night"){
-        #   
-        #   if(max(valueCol) > 0 & min(valueCol) < 0){
-        #     replot <- replot +
-        #       scale_fill_gradientn(
-        #         colors = c(rev(brewer.pal(4, "RdPu")),
-        #                    brewer.pal(4, "PuBuGn")),
-        #         limits = c(-extremeValue, extremeValue))}
-        #   
-        #   replot <- replot +
-        #     coord_sf(datum=NA)+ #bug
-        #     theme_minimal()+
-        #     theme(plot.background = element_rect(fill=hcl(90,50,100)))}
-        }
+            theme_void()}}
       
         
-        replot <- replot+guides(fill = guide_colorbar(barheight = input$heightPlot/50,
+        replot <- replot+guides(fill = guide_colorbar(barheight = sizePlot()$height/50,
                                                       ticks.colour = "black",
                                                       frame.colour= "black"))
       
 
-      if(input$methodPlot=="Facet"){
+      if(input$method=="Facet"){
         ifelse(input$numCategory == 1,
-               replot <- replot + facet_wrap(as.formula(paste0("~",colnames(sf)[2]))),
-               replot <- replot + facet_grid(as.formula(paste0(colnames(sf)[2],"~",colnames(sf)[3]))))}
+               replot <- replot + facet_wrap(as.formula("~ category")),
+               replot <- replot + facet_grid(as.formula("category_1 ~ category_2")))}
       replot <- replot+theme(
-        text = element_text(size = input$sizeFontPlot))
+        text = element_text(size = input$sizeFont))
       
       return(replot)})})
   
   output$datasetSample <- renderDT(server = F, {
+    
     datasetSampleCurrent()})
   
   output$datasetUpload <- renderDT({
-
+    
     datatable(datasetUploadCurrent())})
   
-  ## Download original
   output$downloadDatasetSample <- downloadHandler(
     
     filename = function() {
       paste0(input$region,".csv")},
     
     content = function(file) {
-      write.csv(datasetSampleCurrent(), file,row.names = F)}) #annoying write.csv
+      write.csv(datasetSampleCurrent(),file,row.names = F)}) #annoying write.csv
   
-  output$boxPlot <- renderUI({
-    
+  sizePlot <- reactive({
+    if(input$manualSize){
+      list(width = input$width, height= input$height)  
+    } else{
+      list(width = input$sizeBox[1], height = input$sizeBox[1]/ratioCurrent())
+    }
+  })
+  
+  output$box <- renderUI({
+    validate(need(sizePlot,message = "LOADING"))
     output$plot <- renderPlot({
       plotCurrent()})
-    
-    
+
     tagList(box(
       title = "Plot",
       solidHeader = T,
       collapsible = T,
       width = 12,
       status = "primary",
-      column(
-        align = "center",
-        width = 12,
-        
+      withSpinner(
         plotOutput(
           outputId  = "plot",
-          width = input$widthPlot,
-          height = input$heightPlot))))})}
+          width = sizePlot()$width,
+          height = sizePlot()$height),
+        color = getOption("spinner.color", default = "#3c8dbc"))))})}
       
-
 shinyApp(ui = ui, server = server)
