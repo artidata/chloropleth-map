@@ -119,20 +119,19 @@ ui <- dashboardPage(
     )),
 
 
-  
   dashboardBody(
     # some javascript
     tags$head(tags$script('
-                                var sizeBox = [0, 0];
+                                var widthBox = 0;
                                 $(document).on("shiny:connected", function(e) {
-                                    sizeBox[0] = document.getElementById("box").offsetWidth-52;
-                                    sizeBox[1] = window.innerHeight;
-                                    Shiny.onInputChange("sizeBox", sizeBox);
+                                    widthBox = document.getElementById("box").offsetWidth-52;
+                                    Shiny.onInputChange("widthBox", widthBox);
                                 });
                                 $(window).resize(function(e) {
-                                    sizeBox[0] = document.getElementById("box").offsetWidth-52;
-                                    sizeBox[1] = window.innerHeight;
-                                    Shiny.onInputChange("sizeBox", sizeBox);
+                                    newWidthBox =  document.getElementById("box").offsetWidth-52;
+                                    if(widthBox != newWidthBox){
+                                      Shiny.onInputChange("widthBox", newWidthBox);
+                                    }
                                 });
                             ')),
     
@@ -207,7 +206,7 @@ server <- function(input, output, session) {
     
     input$execute
     isolate({
-      sf <- st_read(paste0(dirCurrent(),"/data.shp"))
+      sf <- st_read(paste0(dirCurrent(),"/data.shp"),quiet=T)
       
       ifelse(input$dataset=="Sample",
              sf <- merge(sf,datasetSampleCurrent(),
@@ -245,7 +244,8 @@ server <- function(input, output, session) {
             lim <- c(0,extremeValue)}
           
           replot <- replot + 
-            scale_fill_gradientn(colors = pal, 
+            scale_fill_gradientn(name=NULL,
+                                 colors = pal, 
                                  limits = lim, 
                                  na.value = "grey50")
           
@@ -284,13 +284,15 @@ server <- function(input, output, session) {
     content = function(file) {
       write.csv(datasetSampleCurrent(),file,row.names = F)}) #annoying write.csv
   
+  
   sizePlot <- reactive({
     if(input$manualSize){
       list(width = input$width, height= input$height)  
     } else{
-      list(width = input$sizeBox[1], height = input$sizeBox[1]/ratioCurrent())
+      list(width = input$widthBox, height = input$widthBox/ratioCurrent())
     }
   })
+  sizePlot <- sizePlot %>% debounce(500)
   
   output$box <- renderUI({
     validate(need(sizePlot,message = "LOADING"))
