@@ -19,16 +19,29 @@ ui <- dashboardPage(
   dashboardSidebar(
     width = 240,
     
+    fluidRow(
+      column(
+        width = 11, #seems more central, although 12 is the default
+        align = "center",
+        actionButton(
+          inputId = "execute",
+          color = "green",
+          label = "RE-PLOT",
+          style = "color: #fff; background-color: #00a65a; border-color: #00a65a;"),
+        
+        tags$head(tags$style(HTML("#execute:hover{background-color:#008d4c !important;}")))
+      )),
+    
     selectInput(
       inputId = "region",
-      label = "Region",
-      choices = list.files("raw_data/"),
-      selected = "world"),
+      label = "Country/Region",
+      choices = list.files("database/"),
+      selected = "World"),
     
     selectInput(
       inputId = "division",
       label = "Division",
-      choices = list.files("raw_data/world")), #hard coding
+      choices = list.files("database/World")), #hard coding
 
     selectInput(
       inputId = "theme",
@@ -89,13 +102,6 @@ ui <- dashboardPage(
       inline = T,
       selected = "Sample"),
     
-    actionButton(
-      inputId = "execute",
-      label = "RE-PLOT",
-      style = "color: #fff; background-color: #3c8dbc; border-color: #3c8dbc;"),
-    
-    tags$head(tags$style(HTML("
-    #execute:hover{background-color:#367fa9 !important;}"))),
     
     checkboxInput(
       inputId = "manualSize",
@@ -170,10 +176,10 @@ server <- function(input, output, session) {
     updateSelectInput(session,
                       inputId = "division",
                       choices = list.files(paste0(
-                        "raw_data/", input$region)))})
+                        "database/", input$region)))})
   
   dirCurrent <- reactive({
-    paste0("raw_data/",input$region,"/",input$division)
+    paste0("database/",input$region,"/",input$division)
   }) %>% debounce(200) #debouce
   
   ratioCurrent <- reactive({
@@ -206,7 +212,7 @@ server <- function(input, output, session) {
     
     input$execute
     isolate({
-      sf <- st_read(paste0(dirCurrent(),"/data.shp"),quiet=T)
+      sf <- st_read(paste0(dirCurrent(),"/feature.gpkg"),quiet=T)
       
       ifelse(input$dataset=="Sample",
              sf <- merge(sf,datasetSampleCurrent(),
