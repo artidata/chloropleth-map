@@ -14,7 +14,7 @@ ui <- dashboardPage(
                  messageItem(
                    from = "artidata",
                    message = "Click here to learn more about the app!",
-                   href = "http://artidata.io/blog/posts/2018-10-29-choropleth-map-app/"))),
+                   href = "http://blog.artidata.io/posts/2018-10-29-choropleth-map-app/"))),
   
   dashboardSidebar(
     width = 240,
