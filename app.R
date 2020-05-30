@@ -10,11 +10,18 @@ ui <- dashboardPage(
   dashboardHeader(
     title = "Choropleth Map",
     titleWidth = 240,
-    dropdownMenu(type = "messages",
-                 messageItem(
-                   from = "artidata",
-                   message = "Click here to learn more about the app!",
-                   href = "http://blog.artidata.io/posts/2018-10-29-choropleth-map-app/"))),
+
+    tags$li(a(href="http://blog.artidata.io/posts/2018-10-29-choropleth-map-app/",
+              icon("question-circle"),
+              title="Help Page",
+              style="cursor: pointer;"),
+            class="dropdown"),
+    
+    tags$li(a(href="http://apps.artidata.io",
+              icon("home"),
+              title="apps.artidata.io",
+              style="cursor: pointer;"),
+            class="dropdown")),
   
   dashboardSidebar(
     width = 240,
@@ -214,11 +221,13 @@ server <- function(input, output, session) {
     isolate({
       sf <- st_read(paste0(dirCurrent(),"/feature.gpkg"),quiet=T)
       
-      ifelse(input$dataset=="Sample",
-             sf <- merge(sf,datasetSampleCurrent(),
-                         by = "division"),
-             sf <- merge(sf,datasetUploadCurrent(),
-                         by = "division"))
+      if(input$dataset=="Sample"){
+        sf <- merge(sf,datasetSampleCurrent(),
+                    by = "division")
+      } else {
+        sf <- merge(sf,datasetUploadCurrent(),
+                    by = "division")
+      }
       
       replot <- ggplot(data = sf)
       
@@ -260,7 +269,7 @@ server <- function(input, output, session) {
             theme_void()}}
       
         
-        replot <- replot+guides(fill = guide_colorbar(barheight = sizePlot()$height/50,
+        replot <- replot+guides(fill = guide_colorbar(barheight = sizePlotD()$height/50,
                                                       ticks.colour = "black",
                                                       frame.colour= "black"))
       
@@ -298,10 +307,10 @@ server <- function(input, output, session) {
       list(width = input$widthBox, height = input$widthBox/ratioCurrent())
     }
   })
-  sizePlot <- sizePlot %>% debounce(500)
+  sizePlotD <- sizePlot %>% debounce(500)
   
   output$box <- renderUI({
-    validate(need(sizePlot,message = "LOADING"))
+    validate(need(sizePlotD,message = "LOADING"))
     output$plot <- renderPlot({
       plotCurrent()})
 
@@ -314,8 +323,8 @@ server <- function(input, output, session) {
       withSpinner(
         plotOutput(
           outputId  = "plot",
-          width = sizePlot()$width,
-          height = sizePlot()$height),
+          width = sizePlotD()$width,
+          height = sizePlotD()$height),
         color = getOption("spinner.color", default = "#3c8dbc"))))})}
       
 shinyApp(ui = ui, server = server)
