@@ -301,6 +301,7 @@ server <- function(input, output, session) {
   
   
   sizePlot <- reactive({
+    req(input$widthBox)
     if(input$manualSize){
       list(width = input$width, height= input$height)  
     } else{
