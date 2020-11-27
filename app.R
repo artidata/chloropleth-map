@@ -10,25 +10,45 @@ ui <- dashboardPage(
   dashboardHeader(
     title = "Choropleth Map",
     titleWidth = 240,
-    dropdownMenu(type = "messages",
-                 messageItem(
-                   from = "artidata",
-                   message = "Click here to learn more about the app!",
-                   href = "http://artidata.io/blog/posts/2018-10-29-choropleth-map-app/"))),
+
+    tags$li(a(href="http://blog.artidata.io/posts/2018-10-29-choropleth-map-app/",
+              icon("question-circle"),
+              title="Help Page",
+              style="cursor: pointer;"),
+            class="dropdown"),
+    
+    tags$li(a(href="http://apps.artidata.io",
+              icon("home"),
+              title="apps.artidata.io",
+              style="cursor: pointer;"),
+            class="dropdown")),
   
   dashboardSidebar(
     width = 240,
     
+    fluidRow(
+      column(
+        width = 11, #seems more central, although 12 is the default
+        align = "center",
+        actionButton(
+          inputId = "execute",
+          color = "green",
+          label = "RE-PLOT",
+          style = "color: #fff; background-color: #00a65a; border-color: #00a65a;"),
+        
+        tags$head(tags$style(HTML("#execute:hover{background-color:#008d4c !important;}")))
+      )),
+    
     selectInput(
       inputId = "region",
-      label = "Region",
-      choices = list.files("raw_data/"),
-      selected = "world"),
+      label = "Country/Region",
+      choices = list.files("database/"),
+      selected = "World"),
     
     selectInput(
       inputId = "division",
       label = "Division",
-      choices = list.files("raw_data/world")), #hard coding
+      choices = list.files("database/World")), #hard coding
 
     selectInput(
       inputId = "theme",
@@ -89,13 +109,6 @@ ui <- dashboardPage(
       inline = T,
       selected = "Sample"),
     
-    actionButton(
-      inputId = "execute",
-      label = "RE-PLOT",
-      style = "color: #fff; background-color: #3c8dbc; border-color: #3c8dbc;"),
-    
-    tags$head(tags$style(HTML("
-    #execute:hover{background-color:#367fa9 !important;}"))),
     
     checkboxInput(
       inputId = "manualSize",
@@ -119,20 +132,19 @@ ui <- dashboardPage(
     )),
 
 
-  
   dashboardBody(
     # some javascript
     tags$head(tags$script('
-                                var sizeBox = [0, 0];
+                                var widthBox = 0;
                                 $(document).on("shiny:connected", function(e) {
-                                    sizeBox[0] = document.getElementById("box").offsetWidth-52;
-                                    sizeBox[1] = window.innerHeight;
-                                    Shiny.onInputChange("sizeBox", sizeBox);
+                                    widthBox = document.getElementById("box").offsetWidth-52;
+                                    Shiny.onInputChange("widthBox", widthBox);
                                 });
                                 $(window).resize(function(e) {
-                                    sizeBox[0] = document.getElementById("box").offsetWidth-52;
-                                    sizeBox[1] = window.innerHeight;
-                                    Shiny.onInputChange("sizeBox", sizeBox);
+                                    newWidthBox =  document.getElementById("box").offsetWidth-52;
+                                    if(widthBox != newWidthBox){
+                                      Shiny.onInputChange("widthBox", newWidthBox);
+                                    }
                                 });
                             ')),
     
@@ -171,10 +183,10 @@ server <- function(input, output, session) {
     updateSelectInput(session,
                       inputId = "division",
                       choices = list.files(paste0(
-                        "raw_data/", input$region)))})
+                        "database/", input$region)))})
   
   dirCurrent <- reactive({
-    paste0("raw_data/",input$region,"/",input$division)
+    paste0("database/",input$region,"/",input$division)
   }) %>% debounce(200) #debouce
   
   ratioCurrent <- reactive({
@@ -207,13 +219,15 @@ server <- function(input, output, session) {
     
     input$execute
     isolate({
-      sf <- st_read(paste0(dirCurrent(),"/data.shp"))
+      sf <- st_read(paste0(dirCurrent(),"/feature.gpkg"),quiet=T)
       
-      ifelse(input$dataset=="Sample",
-             sf <- merge(sf,datasetSampleCurrent(),
-                         by = "division"),
-             sf <- merge(sf,datasetUploadCurrent(),
-                         by = "division"))
+      if(input$dataset=="Sample"){
+        sf <- merge(sf,datasetSampleCurrent(),
+                    by = "division")
+      } else {
+        sf <- merge(sf,datasetUploadCurrent(),
+                    by = "division")
+      }
       
       replot <- ggplot(data = sf)
       
@@ -245,7 +259,8 @@ server <- function(input, output, session) {
             lim <- c(0,extremeValue)}
           
           replot <- replot + 
-            scale_fill_gradientn(colors = pal, 
+            scale_fill_gradientn(name=NULL,
+                                 colors = pal, 
                                  limits = lim, 
                                  na.value = "grey50")
           
@@ -254,7 +269,7 @@ server <- function(input, output, session) {
             theme_void()}}
       
         
-        replot <- replot+guides(fill = guide_colorbar(barheight = sizePlot()$height/50,
+        replot <- replot+guides(fill = guide_colorbar(barheight = sizePlotD()$height/50,
                                                       ticks.colour = "black",
                                                       frame.colour= "black"))
       
@@ -284,16 +299,19 @@ server <- function(input, output, session) {
     content = function(file) {
       write.csv(datasetSampleCurrent(),file,row.names = F)}) #annoying write.csv
   
+  
   sizePlot <- reactive({
+    req(input$widthBox)
     if(input$manualSize){
       list(width = input$width, height= input$height)  
     } else{
-      list(width = input$sizeBox[1], height = input$sizeBox[1]/ratioCurrent())
+      list(width = input$widthBox, height = input$widthBox/ratioCurrent())
     }
   })
+  sizePlotD <- sizePlot %>% debounce(500)
   
   output$box <- renderUI({
-    validate(need(sizePlot,message = "LOADING"))
+    validate(need(sizePlotD,message = "LOADING"))
     output$plot <- renderPlot({
       plotCurrent()})
 
@@ -306,8 +324,8 @@ server <- function(input, output, session) {
       withSpinner(
         plotOutput(
           outputId  = "plot",
-          width = sizePlot()$width,
-          height = sizePlot()$height),
+          width = sizePlotD()$width,
+          height = sizePlotD()$height),
         color = getOption("spinner.color", default = "#3c8dbc"))))})}
       
 shinyApp(ui = ui, server = server)
